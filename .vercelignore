@@ -1,0 +1,14 @@
+# A prévia pública usa apenas os arquivos necessários ao visual.
+test_script_*.js
+tailwind.config.js
+tailwind.input.css
+hero-image.png
+logo-santos.png
+hero-marmita-lencois.png
+logo-lencois.png
+logo-moema.png
+logo-sao-manuel.png
+logo.jpg
+Logonova.jpeg
+Marmita*.png
+Marmita*.jpeg

@@ -195,12 +195,13 @@
     }
     </script>
 
-    <!-- Fonts -->
+    <!-- Fontes carregadas sem bloquear a primeira pintura -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="preconnect" href="https://api.fontshare.com">
-    <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&f[]=clash-display@400,500,600,700&display=swap" rel="stylesheet">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" as="style" href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&f[]=clash-display@400,500,600,700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"><link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&f[]=clash-display@400,500,600,700&display=swap"></noscript>
 
     <!-- Ícones sem bloquear a primeira pintura -->
     <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
@@ -356,6 +357,24 @@
         .reveal-left,
         .reveal-right {
             visibility: visible;
+        }
+
+        /* O conteúdo nunca depende de animações externas para ficar visível. */
+        .moema-hero__copy,
+        .moema-hero__visual {
+            animation: cf-enter .7s ease-out both;
+        }
+
+        .moema-hero__visual { animation-delay: .08s; }
+
+        @keyframes cf-enter {
+            from { opacity: 0; transform: translateY(18px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .moema-hero__copy,
+            .moema-hero__visual { animation: none; }
         }
 
         /* Smoke Video Background (Subtle) */
@@ -2043,13 +2062,6 @@
         </div>
     </div>
 
-    <!-- Configuração central; integrações externas são carregadas apenas quando configuradas -->
-    <script src="config.js"></script>
-
-    <!-- GSAP for Animations -->
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
-
     <script>
         function copyPixCode() {
             const copyText = document.getElementById("pix-copia-cola");
@@ -2077,26 +2089,9 @@
             return promise;
         }
 
-        // Initialize Supabase only when real credentials exist.
+        // Prévia visual: mantém o catálogo local e não inicia serviços externos.
         let supabaseClient = null;
-        async function initializeSupabaseClient() {
-            if (!window.SUPABASE_URL || window.SUPABASE_URL === "YOUR_SUPABASE_URL" ||
-                !window.SUPABASE_ANON_KEY || window.SUPABASE_ANON_KEY === "YOUR_SUPABASE_ANON_KEY") {
-                return null;
-            }
-
-            try {
-                await loadExternalScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2', 'supabase');
-                const { createClient } = window.supabase;
-                supabaseClient = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-                window.supabaseClient = supabaseClient;
-                return supabaseClient;
-            } catch (err) {
-                console.error("Erro ao inicializar Supabase:", err);
-                return null;
-            }
-        }
-        const supabaseReady = initializeSupabaseClient();
+        const supabaseReady = Promise.resolve(null);
 
         // Global Cart and Menu variables
         const defaultDishes = [
@@ -3811,8 +3806,6 @@
         }
 
         document.addEventListener('DOMContentLoaded', async function () {
-            gsap.registerPlugin(ScrollTrigger);
-
             // Handle Payment Return
             const urlParams = new URLSearchParams(window.location.search);
             const status = urlParams.get('status');
@@ -3856,65 +3849,14 @@
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
 
-            // Trigger GSAP reveal animations immediately (no preloader)
-            const heroTimeline = gsap.timeline();
-            heroTimeline.fromTo("#hero .reveal-up",
-                { y: 50, autoAlpha: 0 },
-                { y: 0, autoAlpha: 1, duration: 0.8, stagger: 0.15, ease: "back.out(1.7)" }
-            )
-                .fromTo("#hero .reveal-right",
-                    { x: 100, autoAlpha: 0, rotation: 5 },
-                    { x: 0, autoAlpha: 1, rotation: 0, duration: 1, ease: "power3.out" },
-                    "-=0.5"
-                );
-
             // Render menu cards immediately
             filterCategory('Todos');
-
-            // Load latest dishes from Supabase in background
-            supabaseReady.then(() => {
-                if (typeof loadDishes === 'function') {
-                    loadDishes().then(() => filterCategory('Todos')).catch(e => console.warn(e));
-                }
-
-                try {
-                    if (typeof loadCoupons === 'function') loadCoupons();
-                } catch (err) {
-                    console.warn("Erro ao carregar cupons:", err);
-                }
-            });
 
             // Update badges and render cart state on load
             updateCartBadges();
             renderCart();
             initCheckoutFormStatePersistence();
 
-            // ScrollTrigger Animations for Menu and other sections
-            const revealElements = document.querySelectorAll('.reveal-up:not(#hero .reveal-up), .reveal-right:not(#hero .reveal-right)');
-            revealElements.forEach((elem) => {
-                let startY = elem.classList.contains('reveal-up') ? 60 : 0;
-                let startX = elem.classList.contains('reveal-right') ? 100 : 0;
-                let startRot = elem.classList.contains('reveal-right') ? 5 : 0;
-
-                gsap.fromTo(elem,
-                    { y: startY, x: startX, rotation: startRot, autoAlpha: 0 },
-                    {
-                        y: 0, x: 0, rotation: 0,
-                        autoAlpha: 1,
-                        duration: 0.8,
-                        ease: "power2.out",
-                        scrollTrigger: {
-                            trigger: elem,
-                            start: "top 85%", // Trigger when top of element hits 85% of viewport
-                            toggleActions: "play none none reverse"
-                        }
-                    }
-                );
-            });
-
-            // Parallax effect on background huge text
-            // bg-text-1 parallax removed
-            // bg-text-2 parallax removed
         });
 
         // ===== SMOKE VIDEO SCROLL FADE =====
